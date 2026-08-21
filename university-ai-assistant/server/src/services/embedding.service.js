@@ -1,8 +1,13 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 const embeddingModel = genAI.getGenerativeModel({ model: 'text-embedding-004' });
 
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * توليد embedding لنص واحد (يُستخدم في RAG للبحث عن السؤال)
+ */
 export async function embedText(text) {
   if (!text || typeof text !== 'string') {
     throw new Error('النص المراد تضمينه غير صالح');
@@ -11,24 +16,24 @@ export async function embedText(text) {
   return result.embedding.values;
 }
 
-export async function embedChunks(chunks) {
-  const embeddings = [];
-  for (let i = 0; i < chunks.length; i++) {
-    const chunk = chunks[i];
-    try {
-      const vector = await embedText(chunk.content);
-      embeddings.push({
-        ...chunk,
-        embedding: vector,
-      });
-      // تأخير بسيط لمنع تجاوز الحد المجاني
-      if (i < chunks.length - 1) {
-        await new Promise((res) => setTimeout(res, 120));
-      }
-    } catch (err) {
-      console.error(`خطأ في الجزء ${i}:`, err.message);
-      throw err;
+/**
+ * توليد embeddings لمصفوفة من النصوص (يُستخدم في رفع الـ PDF)
+ */
+export async function embedBatch(texts) {
+  const vectors = [];
+  for (let i = 0; i < texts.length; i++) {
+    const text = typeof texts[i] === 'string' ? texts[i] : texts[i].content;
+    const vector = await embedText(text);
+    vectors.push(vector);
+    
+    // تأخير 100ms لتجنب تخطي الحد المجاني لـ Gemini
+    if (i < texts.length - 1) {
+      await delay(100);
     }
   }
-  return embeddings;
+  return vectors;
+}
+
+export async function embedChunks(chunks) {
+  return embedBatch(chunks);
 }
