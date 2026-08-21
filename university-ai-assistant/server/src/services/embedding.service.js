@@ -1,9 +1,15 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import dotenv from 'dotenv';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+dotenv.config();
 
-// استخدام النموذج المعتمد للتضمين
-const embeddingModel = genAI.getGenerativeModel({ model: 'text-embedding-004' });
+function getGenAI() {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error('Missing GEMINI_API_KEY environment variable.');
+  }
+  return new GoogleGenerativeAI(apiKey);
+}
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -15,22 +21,20 @@ export async function embedText(text) {
     throw new Error('النص المراد تضمينه غير صالح');
   }
 
+  const ai = getGenAI();
+  const model = ai.getGenerativeModel({ model: 'text-embedding-004' });
+
   try {
-    const result = await embeddingModel.embedContent(text);
+    const result = await model.embedContent(text);
     return result.embedding.values;
   } catch (error) {
-    // إذا ظهر خطأ في text-embedding-004، نجرب النموذج البديل embedding-001
-    if (error.message.includes('404') || error.message.includes('not found')) {
-      const fallbackModel = genAI.getGenerativeModel({ model: 'embedding-001' });
-      const fallbackResult = await fallbackModel.embedContent(text);
-      return fallbackResult.embedding.values;
-    }
+    console.error('Embedding error:', error.message);
     throw error;
   }
 }
 
 /**
- * توليد embeddings لمصفوفة من النصوص (يُستخدم في رفع الـ PDF)
+ * توليد embeddings لمصفوفة من النصوص
  */
 export async function embedBatch(texts) {
   const vectors = [];
@@ -39,9 +43,8 @@ export async function embedBatch(texts) {
     const vector = await embedText(text);
     vectors.push(vector);
 
-    // تأخير 100ms لتجنب تخطي الـ Rate Limit المجاني
     if (i < texts.length - 1) {
-      await delay(100);
+      await delay(120);
     }
   }
   return vectors;
