@@ -2,10 +2,8 @@ import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
 import dotenv from 'dotenv';
-
 import { apiLimiter } from './middleware/rateLimiter.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
-
 import uploadRoutes from './routes/upload.routes.js';
 import filesRoutes from './routes/files.routes.js';
 import chatRoutes from './routes/chat.routes.js';
@@ -15,12 +13,10 @@ import coursesRoutes from './routes/courses.routes.js';
 dotenv.config();
 
 const app = express();
-const app = express();
 
-// ✅ أضف هذا السطر هنا لحل تحذير Proxy في Render
+// إعداد البروكسي لمنصة Render
 app.set('trust proxy', 1);
 
-const PORT = process.env.PORT || 5000;
 const PORT = process.env.PORT || 5000;
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 
