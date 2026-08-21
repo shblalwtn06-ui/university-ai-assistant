@@ -1,40 +1,64 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import dotenv from 'dotenv';
-
 dotenv.config();
-
-function getGenAI() {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error('Missing GEMINI_API_KEY environment variable.');
-  }
-  return new GoogleGenerativeAI(apiKey);
-}
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
- * توليد embedding لنص واحد بأبعاد 768
+ * توليد embedding لنص واحد باستخدام Google REST API المباشر
  */
 export async function embedText(text) {
   if (!text || typeof text !== 'string') {
-    throw new Error('النص المراد تضمينه غير صالح');
+    throw new Error('النص غير صالح');
   }
 
-  const ai = getGenAI();
-  const model = ai.getGenerativeModel({ model: 'text-embedding-004' });
-
-  try {
-    const result = await model.embedContent(text);
-    return result.embedding.values;
-  } catch (error) {
-    console.error('Embedding error:', error.message);
-    throw error;
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error('Missing GEMINI_API_KEY');
   }
+
+  // الاستدعاء المباشر لـ Google AI Studio API
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${apiKey}`;
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'models/text-embedding-004',
+      content: {
+        parts: [{ text: text.trim() }],
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    // إذا كان text-embedding-004 غير متاح في منطقتك، نجرب embedding-001 فوراً
+    const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/embedding-001:embedContent?key=${apiKey}`;
+    const fallbackRes = await fetch(fallbackUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'models/embedding-001',
+        content: {
+          parts: [{ text: text.trim() }],
+        },
+      }),
+    });
+
+    if (!fallbackRes.ok) {
+      throw new Error(`Embedding Error: ${errText}`);
+    }
+
+    const fallbackData = await fallbackRes.json();
+    return fallbackData.embedding.values;
+  }
+
+  const data = await response.json();
+  return data.embedding.values;
 }
 
 /**
- * توليد embeddings لمصفوفة من النصوص
+ * معالجة جميع قطع ملف الـ PDF بالتتابع
  */
 export async function embedBatch(texts) {
   const vectors = [];
@@ -43,8 +67,9 @@ export async function embedBatch(texts) {
     const vector = await embedText(text);
     vectors.push(vector);
 
+    // تأخير بسيط لتجنب حد السرعة
     if (i < texts.length - 1) {
-      await delay(120);
+      await delay(100);
     }
   }
   return vectors;
