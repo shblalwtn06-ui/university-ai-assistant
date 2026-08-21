@@ -15,9 +15,6 @@ export const chatModel = genAI.getGenerativeModel({
   model: GEMINI_MODEL || 'gemini-1.5-flash',
 });
 
-// Embedding model (text-embedding-004 -> 768 dimensions, matches the
-// `vector(768)` column defined in supabase/schema.sql)
-xport const chatModel = genAI.getGenerativeModel({
-  model: 'gemini-1.5-flash',
-
+export const embeddingModel = genAI.getGenerativeModel({
+  model: 'text-embedding-004',
 });
